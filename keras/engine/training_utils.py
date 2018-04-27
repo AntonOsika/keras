@@ -116,23 +116,23 @@ def standardize_input_data(data,
     return data
 
 
-def standardize_sample_or_class_weights(x_weight,
-                                        output_names,
-                                        weight_type):
-    """Maps `sample_weight` or `class_weight` to model outputs.
+def standardize_class_weights(class_weight, output_names):
+    """Maps `class_weight` to model outputs.
 
     # Arguments
-        x_weight: User-provided `sample_weight` or `class_weight` argument.
+        x_weight: User-provided `class_weight` argument.
         output_names: List of output names (strings) in the model.
-        weight_type: A string used purely for exception printing.
 
     # Returns
-        A list of `sample_weight` or `class_weight` where there are exactly
+        A list of `class_weight` where there are exactly
             one element per model output.
 
     # Raises
         ValueError: In case of invalid user-provided argument.
+        TypeError: In case of invalid user-provided argument.
     """
+    weight_type = 'class_weight'
+    x_weight = class_weight
     if x_weight is None or len(x_weight) == 0:
         return [None for _ in output_names]
     if len(output_names) == 1:
@@ -165,13 +165,72 @@ def standardize_sample_or_class_weights(x_weight,
                         str(x_weight))
 
 
-def standardize_class_weights(class_weight, output_names):
-    return standardize_sample_or_class_weights(class_weight,
-                                               output_names,
-                                               'class_weight')
-
-
 def standardize_sample_weights(sample_weight, output_names):
+    """Maps `sample_weight` to model outputs.
+
+    # Arguments
+        x_weight: User-provided `sample_weight` argument.
+        output_names: List of output names (strings) in the model.
+
+    # Returns
+        A list of `sample_weight` or where there are exactly
+            one element per model output.
+
+    # Raises
+        ValueError: In case of invalid user-provided argument.
+        TypeError: In case of invalid user-provided argument.
+    """
+    weight_type = 'sample_weight'
+    x_weight = sample_weight
+    if x_weight is None or len(x_weight) == 0:
+        return [None for _ in output_names]
+    if len(output_names) == 1:
+        if isinstance(x_weight, list) and len(x_weight) == 1:
+            return x_weight
+        if isinstance(x_weight, dict):
+            if list(x_weight.keys()) == output_names:
+                return [x_weight[output_names[0]]]
+            else:
+                raise ValueError('Provided `' + weight_type + '` was a dict ' +
+                                 'with keys: ' + str(list(x_weight.keys())) +
+                                 ' but the model has output names: ' +
+                                 str(output_names) + ' outputs. '
+                                 'You should provide `' + weight_type + '`'
+                                 'with keys matching the model output names.')
+        else:
+            return [x_weight]
+    if isinstance(x_weight, list):
+        if len(x_weight) != len(output_names):
+            raise ValueError('Provided `' + weight_type + '` was a list of ' +
+                             str(len(x_weight)) +
+                             ' elements, but the model has ' +
+                             str(len(output_names)) + ' outputs. '
+                             'You should provide one `' + weight_type + '`'
+                             'array per model output.')
+        return x_weight
+    if isinstance(x_weight, dict):
+        leftover_weights = set(x_weight.keys()) - set(output_names)
+        if len(leftover_weights) > 0:
+            raise ValueError('Provided `' + weight_type + '` was a dict ' +
+                             'with keys: ' + str(list(x_weight.keys())) +
+                             ' but the model has output names: ' +
+                             str(output_names) + ' outputs. '
+                             'You should provide `' + weight_type + '`'
+                             'with keys matching the model output names.')
+
+        x_weights = []
+        for name in output_names:
+            x_weights.append(x_weight.get(name))
+        return x_weights
+    else:
+        raise TypeError('The model has multiple outputs, so `' +
+                        weight_type + '` '
+                        'should be either a list or a dict. '
+                        'Provided `' + weight_type +
+                        '` type not understood: ' +
+                        str(x_weight))
+
+
     return standardize_sample_or_class_weights(sample_weight,
                                                output_names,
                                                'sample_weight')
